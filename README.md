@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo_trace.png" alt="TRACE" width="120">
+</p>
+
 # M15: Multiscale Post-Hoc Protocol for Auditing Geometric Fidelity of Latent Projections
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20700231.svg)](https://doi.org/10.5281/zenodo.20700231)
