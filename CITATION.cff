@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software or data, please cite it as below."
+title: "M15: A Multiscale Post-Hoc Protocol for Auditing the Geometric Fidelity of Latent Projections"
+type: software
+authors:
+  - family-names: Abella
+    given-names: Rubén
+    affiliation: "Capriciousecret S.L. / TRACE Research"
+    orcid: ""
+  - family-names: Picón
+    given-names: José
+    affiliation: "Neural Ghost"
+repository-code: "https://github.com/joinsnipe/motor15-geometric-audit"
+url: "https://zenodo.org/records/20700231"
+date-released: "2026-06-15"
+license: MIT
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.20700231"
+keywords:
+  - dimensionality reduction
+  - geometric fidelity
+  - topological data analysis
+  - Mantel test
+  - persistent homology
+  - projection audit
+  - latent space

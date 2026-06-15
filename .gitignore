@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.local
+.DS_Store
+
+# Prevent accidental upload of nominal data
+*_nodos_completo.csv
+*_partido_completo.csv
+*.gexf
+*.graphml
+*trace-metrics*.json
+*trace-refined*.json
+*trace-v3-audit*.json
