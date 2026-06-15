@@ -1,7 +1,7 @@
 # M15: Multiscale Post-Hoc Protocol for Auditing Geometric Fidelity of Latent Projections
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20700231.svg)](https://doi.org/10.5281/zenodo.20700231)
-[![License: MIT](https://img.shields.io/badge/Code-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/Code-Apache%202.0-blue.svg)](LICENSE)
 [![License: CC BY 4.0](https://img.shields.io/badge/Data-CC%20BY%204.0-lightgrey.svg)](LICENSE-DATA)
 
 ## Overview
@@ -112,5 +112,10 @@ If you use this code or data, please cite:
 
 ## License
 
-- **Code**: [MIT License](LICENSE)
-- **Paper & Data**: [CC-BY 4.0](LICENSE-DATA)
+- Code in `code/` is licensed under **Apache License 2.0** (see [`LICENSE`](LICENSE)).
+- Paper in `paper/` and data in `data/` are licensed under
+  **Creative Commons Attribution 4.0 International (CC-BY 4.0)**
+  (see [`LICENSE-DATA`](LICENSE-DATA)).
+
+Both licenses require attribution. For commercial licensing of the
+non-released production code, contact: ruben@spetrace.com
