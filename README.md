@@ -63,23 +63,28 @@ python code/reproduce_benchmark_results.py
 
 ### Expected Output
 
-| Scenario | Expected Label | Mantel r_M | W1_norm |
-|----------|---------------|------------|----------|
-| A_CLEAN | PASS | > 0.95 | < 0.50 |
-| B1_LOW_NOISE | PASS/WARN | > 0.90 | < 0.55 |
-| B2_MEDIUM_NOISE | ALERT | 0.75–0.90 | variable |
-| B3_HIGH_NOISE | FAIL | < 0.75 | > 0.65 |
-| C_RANDOM | FAIL | < 0.10 | > 1.0 |
-| D_BRIDGE_COLLAPSE | FAIL | variable | > 0.65 |
-| E_FALSE_OUTLIER | PASS/WARN | > 0.95 | < 0.55 |
-| F_REAL_FISSURE | ALERT | > 0.95 | < 0.55 |
-| G_CLUSTER_SWAP | FAIL | < 0.50 | variable |
-| H_SPECTRAL_REWIRE | FAIL/ALERT | variable | variable |
+The script outputs **raw metric values** for each scenario. Expected metric ranges:
+
+| Scenario | Mantel r_M | W1_norm | D_HT |
+|----------|------------|---------|-------|
+| A_CLEAN | > 0.95 | < 0.50 | < 0.01 |
+| B1_LOW_NOISE | > 0.90 | < 0.55 | < 0.02 |
+| B2_MEDIUM_NOISE | 0.75–0.90 | variable | variable |
+| B3_HIGH_NOISE | < 0.75 | > 0.65 | variable |
+| C_RANDOM | < 0.10 | > 1.0 | > 0.10 |
+| D_BRIDGE_COLLAPSE | variable | > 0.65 | variable |
+| E_FALSE_OUTLIER | > 0.95 | < 0.55 | < 0.02 |
+| F_REAL_FISSURE | > 0.95 | < 0.55 | < 0.02 |
+| G_CLUSTER_SWAP | < 0.50 | variable | variable |
+| H_SPECTRAL_REWIRE | variable | variable | variable |
+
+To apply the ordinal classification (PASS/WARN/ALERT/FAIL) to these metrics, see the paper (Section 4) for a description of the classification protocol.
 
 ## Not Released
 
 The following components are **not released** and remain available under commercial license:
 
+- Calibrated classification thresholds (PASS/WARN/ALERT/FAIL decision boundaries)
 - Production implementation of TRACE Suite engines (M01–M16)
 - Specific LLM prompts and orchestration logic
 - Nominal raw dataset with actor identities

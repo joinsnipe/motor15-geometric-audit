@@ -1,4 +1,4 @@
-# M15 Ordinal Classification Pipeline — Pseudocode
+# M15 Ordinal Classification Pipeline — High-Level Pseudocode
 
 ## Overview
 
@@ -21,19 +21,15 @@ INPUT:  X_high ∈ ℝ^{N×D}   (latent representations)
 
 1. D_high ← pairwise_euclidean_distance(X_high)
 2. D_low  ← pairwise_euclidean_distance(X_low)
-3. D_high_norm ← D_high / max(D_high)
-4. D_low_norm  ← D_low  / max(D_low)
-5. v_high ← upper_triangle(D_high_norm)
-6. v_low  ← upper_triangle(D_low_norm)
-7. r_M ← pearson_correlation(v_high, v_low)
+3. Normalize both matrices by their respective maxima
+4. v_high ← upper_triangle(D_high_norm)
+5. v_low  ← upper_triangle(D_low_norm)
+6. r_M ← pearson_correlation(v_high, v_low)
 
 OUTPUT: r_M ∈ [-1, 1]   (Mantel correlation coefficient)
 ```
 
-### Interpretation
-- `r_M > 0.90`: Strong global metric preservation
-- `r_M ∈ [0.75, 0.90]`: Moderate preservation
-- `r_M < 0.50`: Severe distortion
+**Interpretation**: Higher r_M indicates better global metric preservation. Values near 1.0 mean the projection faithfully preserves pairwise distances.
 
 ---
 
@@ -60,17 +56,14 @@ INPUT:  D_high_norm, D_low_norm  (normalized distance matrices)
 OUTPUT: ph0 = {w1_norm, mst_ratio, var_ratio}
 ```
 
-### Interpretation
-- `w1_norm > 1.0` → Severe skeleton deformation
-- `mst_ratio < 0.08 or > 0.35` → Scale collapse/explosion
-- `var_ratio > 2.0` → Heterogeneous distortion
+**Interpretation**: These metrics capture whether the hierarchical skeleton (MST) is preserved. Large deviations in w1_norm or extreme mst_ratio values indicate topological distortion.
 
 ---
 
 ## Layer 3: Spectral Consistency (Heat Trace Divergence)
 
 ```
-INPUT:  X_high, X_low, k=5
+INPUT:  X_high, X_low, k (number of nearest neighbors)
 
 1. L_high ← normalized_laplacian_knn(X_high, k)
 2. L_low  ← normalized_laplacian_knn(X_low, k)
@@ -88,9 +81,7 @@ INPUT:  X_high, X_low, k=5
 OUTPUT: D_HT ≥ 0   (Heat Trace Divergence)
 ```
 
-### Interpretation
-- `D_HT < 0.014` → Consistent diffusion dynamics
-- `D_HT > 0.015` → Diffusion flow altered by projection
+**Interpretation**: D_HT measures whether the diffusion dynamics (information flow through the graph) are preserved in the projection. Higher values indicate spectral inconsistency.
 
 ---
 
@@ -99,83 +90,57 @@ OUTPUT: D_HT ≥ 0   (Heat Trace Divergence)
 ```
 INPUT:  X_high ∈ ℝ^{N×D}, cluster_ids ∈ ℤ^N, K permutations
 
-1. Σ_reg ← covariance(X_high) + εI    (regularized)
-2. Σ_inv ← inverse(Σ_reg)
+1. Compute regularized covariance and its inverse
+2. Compute centroid for each cluster
 
-3. FOR each cluster c:
-       centroid[c] ← mean(X_high[cluster_ids == c])
-
-4. FOR each node i:
-       d_structural ← mahalanobis(X_high[i], centroid[cluster_ids[i]], Σ_inv)
-       d_semantic   ← min over c ≠ cluster_ids[i]: mahalanobis(X_high[i], centroid[c], Σ_inv)
+3. FOR each node i:
+       d_structural ← mahalanobis(node_i, centroid_of_its_cluster)
+       d_semantic   ← min mahalanobis(node_i, centroid_of_other_clusters)
        δ_observed[i] ← d_structural - d_semantic
 
-5. FOR p = 1 to K:
-       X_shuffled ← permute_rows(X_high)
-       centroids_shuffled ← recompute_centroids(X_shuffled, cluster_ids)
-       δ_null[p] ← compute_deltas(X_shuffled, centroids_shuffled)
+4. FOR p = 1 to K:
+       Shuffle semantic profiles across nodes (preserving structure)
+       Recompute centroids and deltas → δ_null[p]
 
-6. FOR each node i:
+5. FOR each node i:
        z[i] ← (δ_observed[i] - mean(δ_null[:, i])) / std(δ_null[:, i])
 
-7. max_z ← max(z)
+6. max_z ← max(z)
 
 OUTPUT: max_z   (maximum positive Z-score across all nodes)
 ```
 
-### Interpretation
-- `max_z < 2.0` → No local dissonance detected
-- `max_z ∈ [2.0, 3.0]` → Moderate local anomaly (WARN override)
-- `max_z > 3.0` → Strong local dissonance (ALERT override)
+**Interpretation**: A high Z-score for a node indicates that its semantic profile (latent features) is inconsistent with the community it was assigned to structurally. Standard statistical thresholds (Z > 2 for moderate, Z > 3 for strong) apply.
 
 ---
 
-## Ordinal Classification Rules
+## Ordinal Classification Logic
+
+The four metrics (r_M, D_HT, ph0, max_z) are combined into an ordinal classification using a rule-based decision tree:
 
 ```
 FUNCTION classify_m15(r_M, D_HT, ph0, max_z):
 
-    # Step 1: Global classification from metrics
-    IF r_M < 0.50 OR
-       ph0.mst_ratio > 0.35 OR ph0.mst_ratio < 0.08 OR
-       ph0.w1_norm > 1.0 OR ph0.w1_norm < 0.20:
-        label ← FAIL
-
-    ELSE IF r_M < 0.75 OR
-            ph0.mst_ratio > 0.26 OR ph0.mst_ratio < 0.13 OR
-            ph0.w1_norm > 0.65 OR ph0.w1_norm < 0.28 OR
-            D_HT > 0.015:
-        label ← ALERT
-
-    ELSE IF r_M < 0.90 OR
-            ph0.mst_ratio > 0.22 OR ph0.mst_ratio < 0.15 OR
-            ph0.w1_norm > 0.55 OR ph0.w1_norm < 0.35 OR
-            D_HT > 0.014:
-        label ← WARN
-
-    ELSE:
-        label ← PASS
+    # Step 1: Global classification
+    #   Evaluate r_M, ph0.w1_norm, ph0.mst_ratio, and D_HT
+    #   against calibrated thresholds for each severity level.
+    #   Assign the most severe matching label.
+    label ← evaluate_global_metrics(r_M, D_HT, ph0)
+    #   Returns one of: PASS, WARN, ALERT, FAIL
 
     # Step 2: Local dissonance override
-    IF max_z > 3.0 AND label ∈ {PASS, WARN}:
-        label ← ALERT
-
-    ELSE IF max_z > 2.0 AND label == PASS:
-        label ← WARN
+    #   If max_z exceeds standard statistical thresholds,
+    #   escalate the label (never downgrade).
+    label ← apply_local_override(label, max_z)
 
     RETURN label
 ```
 
----
-
-## Threshold Summary Table
-
-| Metric | PASS | WARN | ALERT | FAIL |
-|--------|------|------|-------|------|
-| **r_M** (Mantel) | ≥ 0.90 | [0.75, 0.90) | [0.50, 0.75) | < 0.50 |
-| **w1_norm** (Wasserstein) | [0.35, 0.55] | (0.28, 0.35) ∪ (0.55, 0.65) | — | < 0.20 or > 1.0 |
-| **mst_ratio** | [0.15, 0.22] | (0.13, 0.15) ∪ (0.22, 0.26) | — | < 0.08 or > 0.35 |
-| **D_HT** (Heat Trace) | < 0.014 | [0.014, 0.015] | > 0.015 | — |
-| **max_z** (Fissure) | < 2.0 | [2.0, 3.0) | ≥ 3.0 | — |
-
-> **Note**: The local dissonance layer acts as an **override** — it can only escalate the label, never downgrade it. This ensures that global fidelity alone cannot mask local anomalies.
+> **Note**: The specific calibrated thresholds for each metric and severity level are part of the production implementation and are not included in this public release. See the paper (Section 4) for a qualitative description of the classification boundaries. The general principle is:
+>
+> - **FAIL**: At least one metric shows extreme deviation from fidelity
+> - **ALERT**: Multiple metrics show moderate-to-significant deviation
+> - **WARN**: Minor deviations detectable but within acceptable margins
+> - **PASS**: All metrics within fidelity bounds
+>
+> The local dissonance layer (Fissure Index) acts as an **override** — it can only escalate the label, never downgrade it. This ensures that global fidelity alone cannot mask local anomalies.

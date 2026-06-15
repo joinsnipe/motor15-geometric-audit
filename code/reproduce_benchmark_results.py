@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-M15 Benchmark — Reproduce Benchmark Results
-=============================================
+M15 Benchmark — Reproduce Raw Metric Results
+==============================================
 Runs the full adversarial benchmark: 10 scenarios × N simulations.
-Computes M15 metrics, classical metrics, and the ablation study.
+Computes M15 raw metrics and classical metrics for each scenario.
+
+NOTE: This script outputs RAW METRIC VALUES only. The ordinal
+classification logic (PASS/WARN/ALERT/FAIL) with calibrated thresholds
+is not included in this public release. See the paper (Section 4) for
+a high-level description of the classification protocol.
 
 Usage:
     python reproduce_benchmark_results.py [--simulations 100]
@@ -82,7 +87,7 @@ def compute_stress(X_high, X_low):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# M15 REFINED METRICS
+# M15 RAW METRIC FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def compute_mantel_r(X_high, X_low):
@@ -169,85 +174,13 @@ def compute_ph0_profile(X_high, X_low):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ORDINAL CLASSIFIER
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def classify_ordinal_m15(r_M, hks_div, ph0):
-    """
-    Apply M15 ordinal classification rules.
-
-    Returns one of: PASS, WARN, ALERT, FAIL
-    """
-    w1_norm = ph0["w1_norm"]
-    mst_ratio = ph0["mst_ratio"]
-
-    if r_M < 0.50 or mst_ratio > 0.35 or mst_ratio < 0.08 or w1_norm > 1.0 or w1_norm < 0.20:
-        return "FAIL"
-    elif r_M < 0.75 or mst_ratio > 0.26 or mst_ratio < 0.13 or w1_norm > 0.65 or w1_norm < 0.28 or hks_div > 0.015:
-        return "ALERT"
-    elif r_M < 0.90 or mst_ratio > 0.22 or mst_ratio < 0.15 or w1_norm > 0.55 or w1_norm < 0.35 or hks_div > 0.014:
-        return "WARN"
-    else:
-        return "PASS"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ABLATION STUDY
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def evaluate_ablation(df):
-    """Compute accuracy, sensitivity, and specificity for 6 model configurations."""
-
-    def label_expected(sc):
-        return "OK" if sc in ["A_CLEAN", "B1_LOW_NOISE"] else "ANOMALY"
-
-    y_true = [label_expected(sc) for sc in df["scenario"]]
-
-    models = {}
-
-    # 1. Mantel-only
-    models["Mantel-only"] = ["ANOMALY" if r < 0.75 else "OK" for r in df["r_M"]]
-
-    # 2. Classical-only (Trustworthiness)
-    models["Classical-only (Trust.)"] = ["ANOMALY" if t < 0.75 else "OK" for t in df["trustworthiness"]]
-
-    # 3. Stress-only
-    models["Stress-only"] = ["ANOMALY" if s > 0.40 else "OK" for s in df["stress"]]
-
-    # 4. Mantel + Classical
-    models["Mantel + Classical"] = [
-        "ANOMALY" if r < 0.75 or t < 0.75 else "OK"
-        for r, t in zip(df["r_M"], df["trustworthiness"])
-    ]
-
-    # 5. M15 Tri-test v1 (Saturated)
-    models["M15 v1 (Saturated)"] = ["ANOMALY" if r < 0.60 else "OK" for r in df["r_M"]]
-
-    # 6. M15 Complete v2
-    models["M15 Complete v2"] = [
-        "ANOMALY" if label in ["ALERT", "FAIL"] else "OK"
-        for label in df["predicted_label"]
-    ]
-
-    def compute_metrics(y_pred):
-        tp = sum(1 for t, p in zip(y_true, y_pred) if t == "ANOMALY" and p == "ANOMALY")
-        tn = sum(1 for t, p in zip(y_true, y_pred) if t == "OK" and p == "OK")
-        fp = sum(1 for t, p in zip(y_true, y_pred) if t == "OK" and p == "ANOMALY")
-        fn = sum(1 for t, p in zip(y_true, y_pred) if t == "ANOMALY" and p == "OK")
-        acc = (tp + tn) / len(y_true)
-        sens = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        spec = tn / (tn + fp) if (tn + fp) > 0 else 0.0
-        return acc, sens, spec
-
-    return {name: compute_metrics(pred) for name, pred in models.items()}
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MAIN BENCHMARK RUNNER
+# MAIN BENCHMARK RUNNER (RAW METRICS ONLY)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def run_benchmark(n_simulations=100):
-    print(f"Starting M15 Benchmark v2 with {n_simulations} simulations per scenario...")
+    print(f"Starting M15 Benchmark with {n_simulations} simulations per scenario...")
+    print("NOTE: This script outputs raw metric values. The ordinal classification")
+    print("      (PASS/WARN/ALERT/FAIL) is described in the paper, Section 4.\n")
     start = time.time()
 
     engine = M15GeometricAudit()
@@ -312,19 +245,10 @@ def run_benchmark(n_simulations=100):
             cont = compute_continuity(X_high, X_low, k=5)
             stress = compute_stress(X_high, X_low)
 
-            # M15 metrics
+            # M15 raw metrics
             r_M = compute_mantel_r(X_high, X_low)
             hks_div = compute_heat_trace_divergence(X_high, X_low, k_neigh=5) if sc != "H_SPECTRAL_REWIRE" else _compute_htd_rewire(X_low, G_rew)
             ph0 = compute_ph0_profile(X_high, X_low)
-
-            # Ordinal classification
-            pred_label = classify_ordinal_m15(r_M, hks_div, ph0)
-
-            # Local dissonance override
-            if max_pos_z > 3.0 and pred_label in ["PASS", "WARN"]:
-                pred_label = "ALERT"
-            elif max_pos_z > 2.0 and pred_label == "PASS":
-                pred_label = "WARN"
 
             results.append({
                 "simulation": seed,
@@ -338,7 +262,6 @@ def run_benchmark(n_simulations=100):
                 "trustworthiness": trust,
                 "continuity": cont,
                 "stress": stress,
-                "predicted_label": pred_label
             })
 
     df = pd.DataFrame(results)
@@ -346,34 +269,29 @@ def run_benchmark(n_simulations=100):
     # Save CSV
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
     os.makedirs(data_dir, exist_ok=True)
-    csv_path = os.path.join(data_dir, "benchmark_raw_results_v2.csv")
+    csv_path = os.path.join(data_dir, "benchmark_reproduced.csv")
     df.to_csv(csv_path, index=False)
 
     elapsed = time.time() - start
     print(f"\nBenchmark completed in {elapsed:.1f}s")
     print(f"Results saved to: {csv_path}")
 
-    # Print summary
-    print("\n" + "=" * 70)
-    print("RESULTS SUMMARY")
-    print("=" * 70)
+    # Print summary (raw metrics only, no classification)
+    print("\n" + "=" * 80)
+    print("RAW METRIC SUMMARY (per scenario, averaged over simulations)")
+    print("=" * 80)
 
-    print(f"\n{'Scenario':<25} {'Mode Label':<12} {'r_M mean':<12} {'W1 mean':<12}")
-    print("-" * 61)
+    print(f"\n{'Scenario':<25} {'r_M':<10} {'D_HT':<10} {'W1_norm':<10} {'MST_ratio':<10} {'max_Z':<10}")
+    print("-" * 75)
     for sc in scenarios:
         df_sc = df[df["scenario"] == sc]
-        mode = df_sc["predicted_label"].mode()[0]
-        print(f"{sc:<25} {mode:<12} {df_sc['r_M'].mean():.4f}      {df_sc['w1_norm'].mean():.4f}")
+        print(f"{sc:<25} {df_sc['r_M'].mean():.4f}    {df_sc['hks_div'].mean():.4f}    "
+              f"{df_sc['w1_norm'].mean():.4f}    {df_sc['mst_ratio'].mean():.4f}    "
+              f"{df_sc['max_abs_z'].mean():.2f}")
 
-    # Ablation study
-    ablation = evaluate_ablation(df)
-    print(f"\n{'Model':<30} {'Accuracy':<12} {'Sensitivity':<14} {'Specificity':<12}")
-    print("-" * 68)
-    for name, (acc, sens, spec) in ablation.items():
-        print(f"{name:<30} {acc*100:.1f}%       {sens*100:.1f}%          {spec*100:.1f}%")
-
-    print(f"\nTotal simulations: {len(df)}")
-    print(f"M15 v2 Accuracy: {ablation['M15 Complete v2'][0]*100:.1f}%")
+    print(f"\nTotal rows: {len(df)} ({n_simulations} simulations × {len(scenarios)} scenarios)")
+    print("\nTo reproduce the classification results from the paper, apply the ordinal")
+    print("classifier described in Section 4 to these raw metrics.")
 
 
 def _compute_htd_rewire(X_low, G_rew):
@@ -394,7 +312,7 @@ def _compute_htd_rewire(X_low, G_rew):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Reproduce M15 Benchmark Results")
+    parser = argparse.ArgumentParser(description="Reproduce M15 Benchmark Raw Metrics")
     parser.add_argument("--simulations", type=int, default=100, help="Simulations per scenario (default: 100)")
     args = parser.parse_args()
     run_benchmark(n_simulations=args.simulations)
